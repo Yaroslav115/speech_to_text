@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+*.exe
+*.test
+coverage.out
+tmp/
+work/
+outputs/*
+!outputs/.gitkeep

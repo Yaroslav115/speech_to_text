@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Whisper Transcription</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f6f7f9;
+      color: #111827;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #f6f7f9;
+    }
+
+    main {
+      width: min(980px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0;
+    }
+
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.15;
+    }
+
+    .status {
+      min-height: 24px;
+      color: #4b5563;
+      font-size: 14px;
+      text-align: right;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    section {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 18px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 14px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 650;
+      color: #374151;
+    }
+
+    .checkbox {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .checkbox input {
+      width: auto;
+    }
+
+    select,
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 10px 12px;
+      color: #111827;
+      background: #ffffff;
+      font: inherit;
+    }
+
+    textarea {
+      min-height: 84px;
+      resize: vertical;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 6px;
+      padding: 11px 14px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      background: #111827;
+      color: #ffffff;
+    }
+
+    button.secondary {
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      color: #111827;
+    }
+
+    button.full {
+      grid-column: 1 / -1;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    audio {
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .meter {
+      height: 10px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e5e7eb;
+    }
+
+    .meter span {
+      display: block;
+      width: 0;
+      height: 100%;
+      background: #2563eb;
+      transition: width 80ms linear;
+    }
+
+    .transcript {
+      min-height: 360px;
+      white-space: pre-wrap;
+      line-height: 1.55;
+      color: #111827;
+    }
+
+    .placeholder {
+      color: #6b7280;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        width: min(100% - 24px, 980px);
+        padding-top: 20px;
+      }
+
+      header,
+      .layout {
+        display: grid;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .status {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Whisper Transcription</h1>
+      </div>
+      <div id="status" class="status">Ready</div>
+    </header>
+
+    <div class="layout">
+      <section class="controls" aria-label="Recorder controls">
+        <label>
+          Backend
+          <select id="backend">
+            <option value="local" selected>Local model</option>
+            <option value="api">OpenAI API</option>
+          </select>
+        </label>
+
+        <label>
+          Language
+          <input id="language" value="en" autocomplete="off">
+        </label>
+
+        <label>
+          Prompt
+          <textarea id="prompt" placeholder="Optional context for Whisper"></textarea>
+        </label>
+
+        <label class="checkbox">
+          <input id="pttEnabled" type="checkbox">
+          Enable push to talk
+        </label>
+
+        <label>
+          Push to talk key
+          <input id="pttKey" value="Space" readonly autocomplete="off">
+        </label>
+
+        <label>
+          Send text URL
+          <input id="sendUrl" placeholder="https://example.com/webhook" autocomplete="off">
+        </label>
+
+        <label class="checkbox">
+          <input id="sendEnabled" type="checkbox">
+          Enable text sending
+        </label>
+
+        <label class="checkbox">
+          <input id="sendAuto" type="checkbox" disabled>
+          Send automatically
+        </label>
+
+        <div class="meter" aria-hidden="true"><span id="level"></span></div>
+
+        <div class="buttons">
+          <button id="start">Start</button>
+          <button id="stop" class="secondary" disabled>Stop</button>
+          <button id="send" class="secondary" disabled>Retry Transcription</button>
+          <button id="clear" class="secondary">Clear Text</button>
+          <button id="sendText" class="secondary full" disabled>Send Text</button>
+        </div>
+        <audio id="preview" controls hidden></audio>
+      </section>
+
+      <section aria-label="Transcript">
+        <div id="transcript" class="transcript placeholder">Record audio, then transcribe it here.</div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const startButton = document.querySelector("#start");
+    const stopButton = document.querySelector("#stop");
+    const sendButton = document.querySelector("#send");
+    const clearButton = document.querySelector("#clear");
+    const statusEl = document.querySelector("#status");
+    const transcriptEl = document.querySelector("#transcript");
+    const previewEl = document.querySelector("#preview");
+    const backendEl = document.querySelector("#backend");
+    const languageEl = document.querySelector("#language");
+    const promptEl = document.querySelector("#prompt");
+    const pttEnabledEl = document.querySelector("#pttEnabled");
+    const pttKeyEl = document.querySelector("#pttKey");
+    const sendUrlEl = document.querySelector("#sendUrl");
+    const sendEnabledEl = document.querySelector("#sendEnabled");
+    const sendAutoEl = document.querySelector("#sendAuto");
+    const sendTextButton = document.querySelector("#sendText");
+    const levelEl = document.querySelector("#level");
+
+    let audioContext;
+    let processor;
+    let source;
+    let stream;
+    let chunks = [];
+    let wavBlob;
+    let recording = false;
+    let transcribing = false;
+    let pttCode = "Space";
+    let pttPressed = false;
+
+    startButton.addEventListener("click", startRecording);
+    stopButton.addEventListener("click", stopRecording);
+    sendButton.addEventListener("click", transcribeRecording);
+    clearButton.addEventListener("click", clearTranscript);
+    pttKeyEl.addEventListener("keydown", setPushToTalkKey);
+    sendEnabledEl.addEventListener("change", updateTextSendingControls);
+    sendUrlEl.addEventListener("input", updateTextSendingControls);
+    sendTextButton.addEventListener("click", () => sendText(getTranscriptText()));
+    document.addEventListener("keydown", handlePushToTalkDown);
+    document.addEventListener("keyup", handlePushToTalkUp);
+    updateTextSendingControls();
+
+    async function startRecording() {
+      if (recording || transcribing) return;
+
+      try {
+        wavBlob = null;
+        chunks = [];
+        previewEl.hidden = true;
+        sendButton.disabled = true;
+
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            channelCount: 1
+          }
+        });
+
+        audioContext = new AudioContext();
+        source = audioContext.createMediaStreamSource(stream);
+        processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+        processor.onaudioprocess = (event) => {
+          if (!recording) return;
+          const input = event.inputBuffer.getChannelData(0);
+          chunks.push(new Float32Array(input));
+          updateLevel(input);
+        };
+
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+        recording = true;
+
+        startButton.disabled = true;
+        stopButton.disabled = false;
+        setStatus("Recording");
+      } catch (error) {
+        setStatus("Microphone unavailable");
+        appendTranscript("Microphone error: " + (error.message || String(error)));
+        resetRecorder();
+      }
+    }
+
+    async function stopRecording() {
+      if (!recording) return;
+
+      recording = false;
+      stopButton.disabled = true;
+      startButton.disabled = false;
+      levelEl.style.width = "0";
+
+      if (processor) processor.disconnect();
+      if (source) source.disconnect();
+      if (stream) stream.getTracks().forEach((track) => track.stop());
+
+      const sampleRate = audioContext ? audioContext.sampleRate : 44100;
+      if (audioContext) await audioContext.close();
+
+      wavBlob = encodeWav(chunks, sampleRate);
+      previewEl.src = URL.createObjectURL(wavBlob);
+      previewEl.hidden = false;
+      sendButton.disabled = wavBlob.size === 0;
+      setStatus(formatBytes(wavBlob.size) + " WAV ready");
+      if (wavBlob.size > 0) {
+        await transcribeRecording();
+      }
+    }
+
+    async function transcribeRecording() {
+      if (!wavBlob || transcribing) return;
+
+      transcribing = true;
+      sendButton.disabled = true;
+      startButton.disabled = true;
+      setStatus("Transcribing");
+
+      const form = new FormData();
+      form.append("backend", backendEl.value);
+      form.append("file", wavBlob, "recording.wav");
+      if (languageEl.value.trim()) form.append("language", languageEl.value.trim());
+      if (promptEl.value.trim()) form.append("prompt", promptEl.value.trim());
+      if (backendEl.value === "api") form.append("response_format", "json");
+
+      try {
+        const response = await fetch("/v1/transcribe", {
+          method: "POST",
+          body: form
+        });
+
+        const contentType = response.headers.get("content-type") || "";
+        const result = contentType.includes("application/json")
+          ? await response.json()
+          : { text: await response.text() };
+
+        if (!response.ok) {
+          throw new Error(result.error || result.text || "Transcription failed");
+        }
+
+        const transcribedText = result.text || JSON.stringify(result, null, 2);
+        appendTranscript(transcribedText);
+        if (sendEnabledEl.checked && sendAutoEl.checked) {
+          await sendText(transcribedText);
+        }
+        setStatus("Done");
+      } catch (error) {
+        appendTranscript("Transcription error: " + (error.message || String(error)));
+        setStatus("Error");
+      } finally {
+        transcribing = false;
+        startButton.disabled = false;
+        sendButton.disabled = false;
+      }
+    }
+
+    function setPushToTalkKey(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      pttCode = event.code;
+      pttKeyEl.value = formatKey(event);
+      setStatus("Push to talk key: " + pttKeyEl.value);
+    }
+
+    function handlePushToTalkDown(event) {
+      if (!pttEnabledEl.checked || event.repeat || pttPressed || transcribing) return;
+      if (event.code !== pttCode) return;
+      if (isTypingTarget(event.target) && event.target !== pttKeyEl) return;
+
+      event.preventDefault();
+      pttPressed = true;
+      startRecording();
+    }
+
+    function handlePushToTalkUp(event) {
+      if (!pttEnabledEl.checked || event.code !== pttCode || !pttPressed) return;
+      if (isTypingTarget(event.target) && event.target !== pttKeyEl) return;
+
+      event.preventDefault();
+      pttPressed = false;
+      stopRecording();
+    }
+
+    function isTypingTarget(target) {
+      if (!target) return false;
+      return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
+    }
+
+    function formatKey(event) {
+      if (event.code === "Space") return "Space";
+      if (event.key && event.key.length === 1) return event.key.toUpperCase();
+      return event.key || event.code;
+    }
+
+    function appendTranscript(text) {
+      const value = String(text || "").trim();
+      if (!value) return;
+
+      if (transcriptEl.classList.contains("placeholder")) {
+        transcriptEl.textContent = value;
+        transcriptEl.classList.remove("placeholder");
+        updateTextSendingControls();
+        return;
+      }
+
+      transcriptEl.textContent = transcriptEl.textContent.trimEnd() + "\n\n" + value;
+      updateTextSendingControls();
+    }
+
+    function clearTranscript() {
+      transcriptEl.textContent = "Record audio, then transcribe it here.";
+      transcriptEl.classList.add("placeholder");
+      setStatus("Text cleared");
+      updateTextSendingControls();
+    }
+
+    async function sendText(text) {
+      const value = String(text || "").trim();
+      const url = sendUrlEl.value.trim();
+      if (!sendEnabledEl.checked) {
+        setStatus("Text sending disabled");
+        return;
+      }
+      if (!url || !value) {
+        setStatus("Nothing to send");
+        return;
+      }
+
+      sendTextButton.disabled = true;
+      setStatus("Sending text");
+      try {
+        const response = await fetch("/v1/send-text", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url,
+            text: value,
+            full_text: getTranscriptText()
+          })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || "Send failed");
+        }
+        setStatus("Text sent");
+      } catch (error) {
+        appendTranscript("Send error: " + (error.message || String(error)));
+        setStatus("Send error");
+      } finally {
+        updateTextSendingControls();
+      }
+    }
+
+    function updateTextSendingControls() {
+      const enabled = sendEnabledEl.checked;
+      const hasUrl = sendUrlEl.value.trim().length > 0;
+      const hasText = getTranscriptText().length > 0;
+      sendAutoEl.disabled = !enabled;
+      sendTextButton.disabled = !enabled || !hasUrl || !hasText;
+    }
+
+    function getTranscriptText() {
+      if (transcriptEl.classList.contains("placeholder")) return "";
+      return transcriptEl.textContent.trim();
+    }
+
+    function resetRecorder() {
+      recording = false;
+      startButton.disabled = false;
+      stopButton.disabled = true;
+      sendButton.disabled = !wavBlob;
+      levelEl.style.width = "0";
+      if (stream) stream.getTracks().forEach((track) => track.stop());
+    }
+
+    function updateLevel(samples) {
+      let sum = 0;
+      for (let i = 0; i < samples.length; i++) {
+        sum += samples[i] * samples[i];
+      }
+      const rms = Math.sqrt(sum / samples.length);
+      levelEl.style.width = Math.min(100, rms * 320) + "%";
+    }
+
+    function encodeWav(buffers, sampleRate) {
+      const samples = flattenBuffers(buffers);
+      const dataSize = samples.length * 2;
+      const buffer = new ArrayBuffer(44 + dataSize);
+      const view = new DataView(buffer);
+
+      writeString(view, 0, "RIFF");
+      view.setUint32(4, 36 + dataSize, true);
+      writeString(view, 8, "WAVE");
+      writeString(view, 12, "fmt ");
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(view, 36, "data");
+      view.setUint32(40, dataSize, true);
+
+      let offset = 44;
+      for (let i = 0; i < samples.length; i++, offset += 2) {
+        const sample = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      }
+
+      return new Blob([view], { type: "audio/wav" });
+    }
+
+    function flattenBuffers(buffers) {
+      const length = buffers.reduce((total, buffer) => total + buffer.length, 0);
+      const result = new Float32Array(length);
+      let offset = 0;
+      for (const buffer of buffers) {
+        result.set(buffer, offset);
+        offset += buffer.length;
+      }
+      return result;
+    }
+
+    function writeString(view, offset, value) {
+      for (let i = 0; i < value.length; i++) {
+        view.setUint8(offset + i, value.charCodeAt(i));
+      }
+    }
+
+    function setStatus(value) {
+      statusEl.textContent = value;
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + " B";
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+      return (bytes / 1024 / 1024).toFixed(1) + " MB";
+    }
+  </script>
+</body>
+</html>
