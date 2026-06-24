@@ -87,6 +87,7 @@ The browser UI includes:
 - **Start** and **Stop** recording buttons
 - **Retry Transcription** for the last recording
 - **Clear Text** to clear the transcript box
+- Cog button for the settings view
 - **Enable push to talk** checkbox
 - **Push to talk key** selector
 - **Send text URL** for forwarding transcript text
@@ -96,11 +97,12 @@ The browser UI includes:
 
 Push-to-talk workflow:
 
-1. Enable **Enable push to talk**.
-2. Click the **Push to talk key** field.
-3. Press the key you want to use.
-4. Hold that key to record.
-5. Release the key to stop and transcribe automatically.
+1. Click the cog button to open settings.
+2. Enable **Enable push to talk**.
+3. Click the **Push to talk key** field.
+4. Press the key you want to use.
+5. Hold that key to record.
+6. Release the key to stop and transcribe automatically.
 
 ## Text Forwarding
 

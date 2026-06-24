@@ -36,8 +36,8 @@ Run:
 Optional build checks:
 
 ```powershell
-go build -o work\whisper-service.exe ./cmd/server
-go build -o work\test-receiver.exe ./cmd/testreceiver
+go build -buildvcs=false -o work\whisper-service.exe ./cmd/server
+go build -buildvcs=false -o work\test-receiver.exe ./cmd/testreceiver
 ```
 
 The generated `.exe` files are ignored and should remain local only.

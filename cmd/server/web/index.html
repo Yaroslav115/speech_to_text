@@ -49,6 +49,30 @@
       text-align: right;
     }
 
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .icon-button {
+      width: 42px;
+      height: 42px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
+      background: #ffffff;
+      color: #111827;
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .view[hidden] {
+      display: none;
+    }
+
     .layout {
       display: grid;
       grid-template-columns: 320px 1fr;
@@ -66,6 +90,34 @@
     .controls {
       display: grid;
       gap: 14px;
+    }
+
+    .settings {
+      display: grid;
+      gap: 16px;
+    }
+
+    .settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+
+    .settings-header h2 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .settings-grid .wide {
+      grid-column: 1 / -1;
     }
 
     label {
@@ -185,6 +237,15 @@
       .status {
         text-align: left;
       }
+
+      .header-actions,
+      .settings-header {
+        align-items: start;
+      }
+
+      .settings-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -194,54 +255,14 @@
       <div>
         <h1>Whisper Transcription</h1>
       </div>
-      <div id="status" class="status">Ready</div>
+      <div class="header-actions">
+        <div id="status" class="status">Ready</div>
+        <button id="settingsOpen" class="icon-button" aria-label="Open settings" title="Settings">⚙</button>
+      </div>
     </header>
 
-    <div class="layout">
+    <div id="appView" class="view layout">
       <section class="controls" aria-label="Recorder controls">
-        <label>
-          Backend
-          <select id="backend">
-            <option value="local" selected>Local model</option>
-            <option value="api">OpenAI API</option>
-          </select>
-        </label>
-
-        <label>
-          Language
-          <input id="language" value="en" autocomplete="off">
-        </label>
-
-        <label>
-          Prompt
-          <textarea id="prompt" placeholder="Optional context for Whisper"></textarea>
-        </label>
-
-        <label class="checkbox">
-          <input id="pttEnabled" type="checkbox">
-          Enable push to talk
-        </label>
-
-        <label>
-          Push to talk key
-          <input id="pttKey" value="Space" readonly autocomplete="off">
-        </label>
-
-        <label>
-          Send text URL
-          <input id="sendUrl" placeholder="https://example.com/webhook" autocomplete="off">
-        </label>
-
-        <label class="checkbox">
-          <input id="sendEnabled" type="checkbox">
-          Enable text sending
-        </label>
-
-        <label class="checkbox">
-          <input id="sendAuto" type="checkbox" disabled>
-          Send automatically
-        </label>
-
         <div class="meter" aria-hidden="true"><span id="level"></span></div>
 
         <div class="buttons">
@@ -258,6 +279,58 @@
         <div id="transcript" class="transcript placeholder">Record audio, then transcribe it here.</div>
       </section>
     </div>
+
+    <section id="settingsView" class="view settings" hidden aria-label="Settings">
+      <div class="settings-header">
+        <h2>Settings</h2>
+        <button id="settingsClose" class="secondary">Back</button>
+      </div>
+
+      <div class="settings-grid">
+        <label>
+          Backend
+          <select id="backend">
+            <option value="local" selected>Local model</option>
+            <option value="api">OpenAI API</option>
+          </select>
+        </label>
+
+        <label>
+          Language
+          <input id="language" value="en" autocomplete="off">
+        </label>
+
+        <label class="wide">
+          Prompt
+          <textarea id="prompt" placeholder="Optional context for Whisper"></textarea>
+        </label>
+
+        <label class="checkbox">
+          <input id="pttEnabled" type="checkbox">
+          Enable push to talk
+        </label>
+
+        <label>
+          Push to talk key
+          <input id="pttKey" value="Space" readonly autocomplete="off">
+        </label>
+
+        <label class="wide">
+          Send text URL
+          <input id="sendUrl" placeholder="https://example.com/webhook" autocomplete="off">
+        </label>
+
+        <label class="checkbox">
+          <input id="sendEnabled" type="checkbox">
+          Enable text sending
+        </label>
+
+        <label class="checkbox">
+          <input id="sendAuto" type="checkbox" disabled>
+          Send automatically
+        </label>
+      </div>
+    </section>
   </main>
 
   <script>
@@ -265,6 +338,10 @@
     const stopButton = document.querySelector("#stop");
     const sendButton = document.querySelector("#send");
     const clearButton = document.querySelector("#clear");
+    const settingsOpenButton = document.querySelector("#settingsOpen");
+    const settingsCloseButton = document.querySelector("#settingsClose");
+    const appView = document.querySelector("#appView");
+    const settingsView = document.querySelector("#settingsView");
     const statusEl = document.querySelector("#status");
     const transcriptEl = document.querySelector("#transcript");
     const previewEl = document.querySelector("#preview");
@@ -294,6 +371,8 @@
     stopButton.addEventListener("click", stopRecording);
     sendButton.addEventListener("click", transcribeRecording);
     clearButton.addEventListener("click", clearTranscript);
+    settingsOpenButton.addEventListener("click", showSettings);
+    settingsCloseButton.addEventListener("click", showApp);
     pttKeyEl.addEventListener("keydown", setPushToTalkKey);
     sendEnabledEl.addEventListener("change", updateTextSendingControls);
     sendUrlEl.addEventListener("input", updateTextSendingControls);
@@ -301,6 +380,20 @@
     document.addEventListener("keydown", handlePushToTalkDown);
     document.addEventListener("keyup", handlePushToTalkUp);
     updateTextSendingControls();
+
+    function showSettings() {
+      appView.hidden = true;
+      settingsView.hidden = false;
+      settingsOpenButton.disabled = true;
+      settingsCloseButton.focus();
+    }
+
+    function showApp() {
+      settingsView.hidden = true;
+      appView.hidden = false;
+      settingsOpenButton.disabled = false;
+      settingsOpenButton.focus();
+    }
 
     async function startRecording() {
       if (recording || transcribing) return;

@@ -46,8 +46,8 @@ if (-not $SkipBuild) {
     $env:GOCACHE = Join-Path $projectRoot "work\go-build"
 
     & $go test ./...
-    & $go build -o "work\whisper-service.exe" ./cmd/server
-    & $go build -o "work\test-receiver.exe" ./cmd/testreceiver
+    & $go build -buildvcs=false -o "work\whisper-service.exe" ./cmd/server
+    & $go build -buildvcs=false -o "work\test-receiver.exe" ./cmd/testreceiver
 }
 
 Write-Host ""
